@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Complete Tkinter GUI Designer - Drag & Drop + Properties</title>
+<style>
+  body {font-family: Arial, sans-serif; margin:0; display:flex; height: 100vh; user-select:none;}
+  #palette {width:200px; background:#ccd6e4; padding:10px; box-sizing:border-box; display:flex; flex-direction:column;}
+  #palette h3 {margin-top:0;}
+  #palette button.widget-btn {margin:5px 0; padding:8px; cursor:move; border-radius:4px; border:1px solid #888; background:#7da9eb; color:black; font-weight: 600; transition:background 0.2s;}
+  #palette button.widget-btn:hover {background:#a4c8ff;}
+  #controls {margin-top:auto; display:flex; flex-direction:column; gap:8px;}
+  #controls button {width:100%; padding:10px; cursor:pointer; border-radius:4px; border:1px solid #888; background:#7da9eb; font-weight:600; transition:background 0.2s;}
+  #controls button:disabled {opacity:0.5; cursor:not-allowed;}
+  #controls button:hover:not(:disabled) {background:#a4c8ff;}
+  #canvas {flex:1; background:#dde2eb; border:1px solid #ccc; position:relative; overflow:auto; user-select:none; box-shadow:inset 0 0 5px #aaa;}
+  .widget {position:absolute; border:1.5px solid transparent; background:#f9f9f9; color:black; font-size:14px; box-sizing:border-box; padding:4px 10px; min-width:50px; min-height:25px; overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:move; border-radius:4px; user-select:none;}
+  .widget.selected {border-color:#1976d2; box-shadow:0 0 8px #1976d2; z-index:9999; background:#e0f7fa;}
+  .resize-handle {width:10px; height:10px; background:#1976d2; position:absolute; right:0; bottom:0; cursor:se-resize; border-radius:2px;}
+  #sidePanel {width:350px; background:#d3dbe7; border-left:1px solid #ccc; padding:15px; box-sizing:border-box; display:flex; flex-direction:column;}
+  #sidePanel h3 {margin-top:0;}
+  /* Properties panel sizing and scrollbar */
+  #properties { max-height: 320px; overflow-y: auto; padding-right: 6px; box-sizing: border-box; }
+  #properties form {display:flex; flex-direction:column; gap:12px; margin:0; padding:0 6px 12px 0;}
+  #properties label {font-weight:600; font-weight:400;}
+  #properties input[type="text"],
+  #properties input[type="number"],
+  #properties input[type="color"],
+  #properties select,
+  #properties textarea {padding:6px 8px; font-size:14px; border-radius:4px; border:1px solid #aaa; width:100%; box-sizing:border-box; resize:vertical; font-family:monospace;}
+  #properties .inline {display:flex; gap:8px;}
+  #properties .inline > label {flex:1;}
+  /* Thin scrollbar styling for WebKit */
+  #properties::-webkit-scrollbar { width: 10px; }
+  #properties::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius:6px; }
+  #properties::-webkit-scrollbar-track { background: transparent; }
+  #buttonsCopyDownload {margin-top:auto; display:flex; gap:8px;}
+  #buttonsCopyDownload button {flex:1; padding:10px; font-weight:700; font-size:14px; border-radius:5px; border:none; background-color:#1976d2; color:#fff; cursor:pointer; transition:background-color 0.2s;}
+  #buttonsCopyDownload button:hover {background-color:#0f4a9b;}
+  /* Generate button style (placed above copy/download) */
+  #generateContainer {margin-top:10px;}
+  #generateCodeBtn {width:100%; padding:10px; font-weight:800; font-size:14px; border-radius:6px; border:none; background-color:#4CAF50; color:#fff; cursor:pointer;}
+  #generateCodeBtn:hover {background-color:#43a047;}
+  #codeOutput {margin-top:15px; width:100%; height:400px; font-family:monospace; font-weight: 300; border:1px solid #aaa; border-radius:4px; background:#fff; padding:8px; resize:none; overflow:auto;}
+  #multiSelectInfo {font-size:12px; color:#555; margin-top:4px;}
+  #contextMenu {position:absolute; background:white; border:1px solid #aaa; box-shadow:2px 2px 5px rgba(0,0,0,0.3); border-radius:3px; z-index:30000; display:none; min-width:160px;}
+  #contextMenu ul {list-style:none; margin:0; padding:4px 0;}
+  #contextMenu ul li {padding:6px 12px; cursor:pointer; user-select:none;}
+  #contextMenu ul li:hover {background:#1976d2; color:white;}
+</style>
+</head>
+<body>
+
+<div id="palette" draggable="false">
+  <h3>Widgets Palette</h3>
+  <button class="widget-btn" data-widget="Button" draggable="true">Button</button>
+  <button class="widget-btn" data-widget="Label" draggable="true">Label</button>
+  <button class="widget-btn" data-widget="Entry" draggable="true">Entry</button>
+  <button class="widget-btn" data-widget="Text" draggable="true">Text</button>
+  <button class="widget-btn" data-widget="Checkbutton" draggable="true">Checkbutton</button>
+  <button class="widget-btn" data-widget="Radiobutton" draggable="true">Radiobutton</button>
+  <button class="widget-btn" data-widget="Scale" draggable="true">Scale (Slider)</button>
+  <button class="widget-btn" data-widget="Listbox" draggable="true">Listbox</button>
+  <button class="widget-btn" data-widget="Combobox" draggable="true">Combobox</button>
+  <button class="widget-btn" data-widget="Spinbox" draggable="true">Spinbox</button>
+  <button class="widget-btn" data-widget="Progressbar" draggable="true">Progressbar</button>
+  <button class="widget-btn" data-widget="Frame" draggable="true">Frame</button>
+  <button class="widget-btn" data-widget="Canvas" draggable="true">Canvas</button>
+
+  <div id="controls">
+    <button id="editPropertiesBtn" disabled>Edit Properties</button>
+    <button id="groupBtn" disabled>Group Selected</button>
+    <button id="ungroupBtn" disabled>Ungroup Selected</button>
+    <button id="deleteBtn" disabled>Delete</button>
+    <button id="saveLayoutBtn">Save Layout</button>
+    <button id="loadLayoutBtn">Load Layout</button>
+    <button id="clearCanvasBtn">Clear Canvas</button>
+    <div id="multiSelectInfo" style="display:none;">Multiple widgets selected</div>
+  </div>
+</div>
+
+<div id="canvas" tabindex="0"></div>
+
+<div id="sidePanel">
+  <h3>Properties</h3>
+  <div id="properties"><em>Select a widget to edit its properties.</em></div>
+  <div id="generateContainer" style="padding:6px 6px 0 6px;">
+    <button id="generateCodeBtn">Generate Python Code</button>
+  </div>
+  <div id="buttonsCopyDownload">
+    <button id="copyCodeBtn" title="Copy Python code to clipboard">Copy Code</button>
+    <button id="downloadCodeBtn" title="Download Python code as .py file">Download .py</button>
+  </div>
+  <textarea id="codeOutput" readonly spellcheck="false" placeholder="Generated Python Tkinter code will appear here..."></textarea>
+</div>
+
+<div id="contextMenu">
+  <ul>
+    <li id="ctxEditProperties">Edit Properties</li>
+    <li id="ctxCopyWidget">Copy Widget</li>
+    <li id="ctxPasteWidget">Paste Widget</li>
+    <li id="ctxDelete">Delete Widget</li>
+  </ul>
+</div>
+
+<input type="file" id="fileLoader" style="display:none" accept=".json"/>
+
+<script>
+(() => {
+  const palette = document.getElementById("palette");
+  const canvas = document.getElementById("canvas");
+  const editPropertiesBtn = document.getElementById("editPropertiesBtn");
+  const deleteBtn = document.getElementById("deleteBtn");
+  const saveLayoutBtn = document.getElementById("saveLayoutBtn");
+  const loadLayoutBtn = document.getElementById("loadLayoutBtn");
+  const clearCanvasBtn = document.getElementById("clearCanvasBtn");
+  const generateCodeBtn = document.getElementById("generateCodeBtn");
+  const groupBtn = document.getElementById("groupBtn");
+  const ungroupBtn = document.getElementById("ungroupBtn");
+  const codeOutput = document.getElementById("codeOutput");
+  const multiSelectInfo = document.getElementById("multiSelectInfo");
+  const fileLoader = document.getElementById("fileLoader");
+  const contextMenu = document.getElementById("contextMenu");
+  const ctxEditProperties = document.getElementById("ctxEditProperties");
+  const ctxCopyWidget = document.getElementById("ctxCopyWidget");
+  const ctxPasteWidget = document.getElementById("ctxPasteWidget");
+  const ctxDelete = document.getElementById("ctxDelete");
+  const propertiesDiv = document.getElementById("properties");
+  const copyCodeBtn = document.getElementById("copyCodeBtn");
+  const downloadCodeBtn = document.getElementById("downloadCodeBtn");
+
+  let widgets = [];
+  let selectedWidgets = new Set();
+  let groups = new Map();
+  let widgetCounter = 0;
+  let groupCounter = 0;
+
+  // Clipboard nội bộ cho widget
+  let widgetClipboard = null;
+
+  const DEFAULTS = {
+    bgMain: "#008b8b",
+    bgWidget: "#f9f9f9",
+    text: "#000000",
+    entryBg: "#ffffff",
+    textBg: "#ffffff",
+    listboxBg: "#ffffff",
+    frameBg: "#dddddd",
+    canvasBg: "#ffffff"
+  };
+
+  const fontFamilies = ["Arial","Helvetica","Courier","Times New Roman","Comic Sans MS","Tahoma","Verdana","Segoe UI"];
+  const fontSizes = [8,9,10,11,12,14,16,18,20,24,28,32];
+
+  const widgetDefaults = {
+    Button: { text: "Button", w: 90, h: 32, bg: DEFAULTS.bgWidget, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false },
+    Label: { text: "Label", w: 90, h: 25, bg: DEFAULTS.bgWidget, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false },
+    Entry: { text: "", w: 160, h: 30, bg: DEFAULTS.entryBg, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false },
+    Text: { text: "", w: 220, h: 120, bg: DEFAULTS.textBg, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false },
+    Checkbutton: { text: "Check me", w: 160, h: 30, bg: DEFAULTS.bgWidget, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false, variable: "" },
+    Radiobutton: { text: "Option", w: 160, h: 30, bg: DEFAULTS.bgWidget, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false, value: 1, variable: "" },
+    Scale: { from_: 0, to: 100, orient: "horizontal", w: 180, h: 50 },
+    Listbox: { items: ["Item 1", "Item 2", "Item 3"], w: 180, h: 140, bg: DEFAULTS.listboxBg, fg: DEFAULTS.text, fontFamily: "Arial", fontSize: 12, fontWeight: "normal", fontSlant: "roman", underline: false },
+    Combobox: { values: ["Option1", "Option2"], w: 180, h: 30, state: 'readonly', fontFamily: 'Arial', fontSize: 12, fontWeight: 'normal', fontSlant: 'roman', underline: false },
+    Spinbox: { from_: 0, to: 10, increment: 1, values: [], state: 'normal', wrap: 'false', w: 100, h: 30 },
+    Progressbar: { orient: "horizontal", length: 180, mode: "determinate", maximum: 100, value: 0, w: 180, h: 20 },
+    Frame: { w: 220, h: 140, bg: DEFAULTS.frameBg, relief: "flat", borderwidth: 0 },
+    Canvas: { w: 220, h: 140, bg: DEFAULTS.canvasBg, relief: "flat", borderwidth: 1 }
+  };
+
+  const propertySchemas = {
+    Button: {
+      text: { label: "Text", type: "text" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Label: {
+      text: { label: "Text", type: "text" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Entry: {
+      text: { label: "Default text", type: "text" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Text: {
+      text: { label: "Default text", type: "textarea" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Checkbutton: {
+      text: { label: "Text", type: "text" },
+      variable: { label: "Variable name", type: "text" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Radiobutton: {
+      text: { label: "Text", type: "text" },
+      variable: { label: "Variable name", type: "text" },
+      value: { label: "Value", type: "text" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Scale: {
+      from_: { label: "From", type: "number" },
+      to: { label: "To", type: "number" },
+      orient: { label: "Orientation", type: "select", options: ["horizontal", "vertical"] }
+    },
+    Listbox: {
+      items: { label: "Items (one per line)", type: "textarea" },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Combobox: {
+      values: { label: "Values (comma separated)", type: "text" },
+      state: { label: "State", type: "select", options: ["readonly", "normal", "disabled"] },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Spinbox: {
+      values: { label: "Values (comma separated)", type: "text" },
+      from_: { label: "From", type: "number" },
+      to: { label: "To", type: "number" },
+      increment: { label: "Increment", type: "number" },
+      state: { label: "State", type: "select", options: ["normal","readonly","disabled"] },
+      wrap: { label: "Wrap Around", type: "select", options: ["false","true"] }
+    },
+    Text: {
+      text: { label: "Default text", type: "textarea" },
+      wrap: { label: "Wrap", type: "select", options: ["word","char","none"] },
+      state: { label: "State", type: "select", options: ["normal","disabled"] },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Radiobutton: {
+      text: { label: "Text", type: "text" },
+      variable: { label: "Variable name", type: "text" },
+      value: { label: "Value", type: "text" },
+      state: { label: "State", type: "select", options: ["normal","disabled"] },
+      bg: { label: "Background", type: "color" },
+      fg: { label: "Foreground", type: "color" },
+      fontFamily: { label: "Font family", type: "select", options: fontFamilies },
+      fontSize: { label: "Font size", type: "select", options: fontSizes.map(String) },
+      fontWeight: { label: "Bold", type: "select", options: ["normal","bold"] },
+      fontSlant: { label: "Italic", type: "select", options: ["roman","italic"] },
+      underline: { label: "Underline", type: "select", options: ["false","true"] }
+    },
+    Progressbar: {
+      orient: { label: "Orientation", type: "select", options: ["horizontal", "vertical"] },
+      length: { label: "Length", type: "number" },
+      maximum: { label: "Maximum", type: "number" },
+      mode: { label: "Mode", type: "select", options: ["determinate", "indeterminate"] },
+      value: { label: "Value", type: "number" }
+    },
+    Frame: {
+      bg: { label: "Background", type: "color" },
+      relief: { label: "Relief", type: "select", options: ["flat","raised","sunken","groove","ridge"] },
+      borderwidth: { label: "Border width", type: "number" }
+    },
+    Canvas: {
+      bg: { label: "Background", type: "color" },
+      borderwidth: { label: "Border width", type: "number" },
+      relief: { label: "Relief", type: "select", options: ["flat","raised","sunken","groove","ridge"] }
+    }
+  };
+
+  function pyStrEscape(str) {
+    return String(str).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+  }
+  function normalizeColor(color) {
+    if (!color) return "";
+    const c = color.trim().toLowerCase();
+    if (c.startsWith("#")) {
+      if (c.length === 4) {
+        const r = c[1], g = c[2], b = c[3];
+        return `#${r}${r}${g}${g}${b}${b}`;
+      }
+      return c;
+    }
+    const rgbMatch = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgbMatch) {
+      const r = Math.max(0, Math.min(255, parseInt(rgbMatch[1], 10)));
+      const g = Math.max(0, Math.min(255, parseInt(rgbMatch[2], 10)));
+      const b = Math.max(0, Math.min(255, parseInt(rgbMatch[3], 10)));
+      const toHex = (n) => n.toString(16).padStart(2, "0");
+      return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+    return c;
+  }
+  function buildTkFontTuple(p) {
+    const parts = [];
+    const fam = p.fontFamily || "Arial";
+    const size = parseInt(p.fontSize || 12);
+    parts.push(`"${fam}"`);
+    parts.push(`${size}`);
+    if ((p.fontWeight||"normal") === "bold") parts.push(`"bold"`);
+    if ((p.fontSlant||"roman") === "italic") parts.push(`"italic"`);
+    if (String(p.underline||"false") === "true") parts.push(`"underline"`);
+    return "(" + parts.join(", ") + ")";
+  }
+  function applyCssFont(el, p) {
+    if (!el) return;
+    el.style.fontFamily = p.fontFamily || "Arial";
+    el.style.fontSize = (parseInt(p.fontSize||12)) + "px";
+    el.style.fontWeight = (p.fontWeight||"normal") === "bold" ? "bold" : "normal";
+    el.style.fontStyle = (p.fontSlant||"roman") === "italic" ? "italic" : "normal";
+    el.style.textDecoration = String(p.underline||"false") === "true" ? "underline" : "none";
+  }
+
+  const mainForm = document.createElement("div");
+  mainForm.id = "mainForm";
+  mainForm.style.position = "absolute";
+  mainForm.style.left = "50px";
+  mainForm.style.top = "50px";
+  mainForm.style.width = "800px";
+  mainForm.style.height = "600px";
+  mainForm.style.border = "2px solid #1976d2";
+  mainForm.style.backgroundColor = DEFAULTS.bgMain;
+  mainForm.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.2)";
+  mainForm.style.overflow = "hidden";
+  mainForm.style.resize = "both";
+  mainForm.style.zIndex = "1000";
+  mainForm.style.display = "flex";
+  mainForm.style.flexDirection = "column";
+  mainForm.style.alignItems = "center";
+  mainForm.style.justifyContent = "center";
+  mainForm.style.userSelect = "none";
+  canvas.appendChild(mainForm);
+
+  const mainFormProperties = {
+    title: { label: "Title", type: "text", default: "Generated GUI" },
+    bg: { label: "Background color", type: "color", default: DEFAULTS.bgMain },
+    width: { label: "Width (px)", type: "number", default: 800 },
+    height: { label: "Height (px)", type: "number", default: 600 }
+  };
+
+  function renderMainFormProperties() {
+    propertiesDiv.innerHTML = "";
+    const form = document.createElement("form");
+    form.id = "mainFormPropertiesForm";
+    for (const prop in mainFormProperties) {
+      const propData = mainFormProperties[prop];
+      const label = document.createElement("label");
+      label.textContent = propData.label;
+      let input;
+      if (propData.type === "text" || propData.type === "color") {
+        input = document.createElement("input");
+        input.type = propData.type;
+        input.value = mainForm.dataset[prop] || propData.default;
+      } else if (propData.type === "number") {
+        input = document.createElement("input");
+        input.type = "number";
+        input.value = parseInt(mainForm.style[prop]) || propData.default;
+      }
+      input.name = prop;
+      input.style.marginTop = "4px";
+      input.style.marginBottom = "10px";
+      label.appendChild(input);
+      form.appendChild(label);
+    }
+    form.addEventListener("input", () => applyMainFormProperties(new FormData(form)));
+    propertiesDiv.appendChild(form);
+  }
+
+  function applyMainFormProperties(formData) {
+    for (const [key, value] of formData.entries()) {
+      if (key === "title") {
+        mainForm.dataset.title = value;
+      } else if (key === "bg") {
+        const hex = normalizeColor(value) || DEFAULTS.bgMain;
+        mainForm.style.backgroundColor = hex;
+        mainForm.dataset.bg = hex;
+      } else if (key === "width") {
+        mainForm.style.width = `${Math.max(300, parseInt(value))}px`;
+      } else if (key === "height") {
+        mainForm.style.height = `${Math.max(300, parseInt(value))}px`;
+      }
+    }
+    updateGeneratedCodePreview();
+  }
+
+  function updateGeneratedCodePreview() {
+    const formWidth = mainForm.offsetWidth;
+    const formHeight = mainForm.offsetHeight;
+    const formTitle = mainForm.dataset.title || "Designed GUI tkinter App";
+    const formBg = mainForm.dataset.bg || DEFAULTS.bgMain;
+    let code = `import tkinter as tk \nfrom tkinter import * \nfrom tkinter import ttk\n\n`;
+    code += `windowDesign = Tk()\n`;
+    code += `windowDesign.title('${formTitle}')\n`;
+    code += `windowDesign.iconbitmap('')\n`;
+    code += `windowDesign.geometry('${formWidth}x${formHeight}')\n`;
+    code += `windowDesign.configure(bg='${formBg}')\n`;
+    code += `windowDesign.resizable(False, False)\n\n`;
+    code += "# Drag and drop widget to main form and click Generate python code.\n";
+    code += `if __name__ == "__main__":\n`;
+    code += `    windowDesign.mainloop()\n`;
+    codeOutput.value = code.trim();
+  }
+
+  mainForm.addEventListener("click", (e) => {
+    e.stopPropagation();
+    clearSelection();
+    renderMainFormProperties();
+  });
+  mainForm.dataset.title = "Designed GUI tikinter App";
+  mainForm.dataset.bg = DEFAULTS.bgMain;
+
+  function createWidget(type, x=20, y=20, props={}, id=null, groupId=null){
+    id = id || `w${widgetCounter++}`;
+    const defaults = widgetDefaults[type] || {};
+    const p = Object.assign({}, defaults, props || {});
+    const w = p.w || defaults.w || 80;
+    const h = p.h || defaults.h || 30;
+
+    const el = document.createElement("div");
+    el.classList.add("widget");
+    el.dataset.type = type;
+    el.dataset.id = id;
+    if(groupId) el.dataset.group = groupId;
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    el.style.width = w + "px";
+    el.style.height = h + "px";
+    el.tabIndex = 0;
+
+    const bg = p.bg || defaults.bg || DEFAULTS.bgWidget;
+    const fg = p.fg || defaults.fg || DEFAULTS.text;
+
+    switch(type){
+      case "Button":
+      case "Label":
+        el.textContent = p.text;
+        el.style.backgroundColor = bg;
+        el.style.color = fg;
+        applyCssFont(el, p);
+        break;
+      case "Entry":
+        el.style.display = "flex";
+        el.style.alignItems = "center";
+        el.innerHTML = `<input type="text" disabled style="width:100%; border:none; cursor:default;" value="${(p.text||"").replace(/"/g,"&quot;")}" />`;
+        {
+          const inputEl = el.querySelector("input");
+          inputEl.style.backgroundColor = bg || DEFAULTS.entryBg;
+          inputEl.style.color = fg || DEFAULTS.text;
+          applyCssFont(inputEl, p);
+        }
+        break;
+      case "Text":
+        el.style.display = "flex";
+        el.style.alignItems = "center";
+        el.innerHTML = `<textarea disabled style="width:100%; height:100%; border:none; resize:none; cursor:default;">${p.text||""}</textarea>`;
+        {
+          const ta = el.querySelector("textarea");
+          ta.style.backgroundColor = bg || DEFAULTS.textBg;
+          ta.style.color = fg || DEFAULTS.text;
+          applyCssFont(ta, p);
+        }
+        break;
+      case "Checkbutton":
+        el.style.justifyContent = "flex-start";
+        el.innerHTML = `<input type="checkbox" disabled style="margin-right:6px;" /><span>${p.text}</span>`;
+        el.style.backgroundColor = bg;
+        const spanC = el.querySelector("span");
+        if (spanC) { spanC.style.color = fg; applyCssFont(spanC, p); }
+        if(p.variable) el.dataset.variable = p.variable;
+        break;
+      case "Radiobutton":
+        el.style.justifyContent = "flex-start";
+        el.innerHTML = `<input type="radio" disabled name="radioGroup${id}" style="margin-right:6px;" /><span>${p.text}</span>`;
+        el.style.backgroundColor = bg;
+        const spanR = el.querySelector("span");
+        if (spanR) { spanR.style.color = fg; applyCssFont(spanR, p); }
+        el.dataset.value = p.value ?? 1;
+        if(p.variable) el.dataset.variable = p.variable;
+        break;
+      case "Scale":
+        el.textContent = `Scale (${p.from_} .. ${p.to})`;
+        el.dataset.from_ = p.from_;
+        el.dataset.to = p.to;
+        el.dataset.orient = p.orient || "horizontal";
+        break;
+      case "Listbox":
+        el.style.overflowY = "auto";
+        el.style.flexDirection = "column";
+        el.style.display = "flex";
+        el.style.padding = "6px 8px";
+        el.style.justifyContent = "flex-start";
+        el.style.alignItems = "stretch";
+        el.style.whiteSpace = "normal";
+        el.style.textAlign = "left";
+        el.style.borderRadius = "4px";
+        el.style.backgroundColor = bg;
+        el.style.color = fg;
+        applyCssFont(el, p);
+        (p.items||[]).forEach(item => {
+          const li = document.createElement("div");
+          li.style.padding = "2px 4px";
+          li.style.borderBottom = "1px solid #ddd";
+          li.style.fontSize = el.style.fontSize || "12px";
+          li.style.fontFamily = el.style.fontFamily || "Arial";
+          li.style.fontWeight = el.style.fontWeight || "normal";
+          li.style.fontStyle = el.style.fontStyle || "normal";
+          li.style.textDecoration = el.style.textDecoration || "none";
+          li.textContent = item;
+          el.appendChild(li);
+        });
+        break;
+      case "Combobox":
+        el.textContent = "Combobox: " + (p.values ? p.values.join(", ") : "");
+        el.dataset.values = (p.values || []).join(",");
+        el.style.backgroundColor = bg;
+        el.style.color = fg;
+        applyCssFont(el, p);
+        break;
+      case "Spinbox":
+        el.textContent = `Spinbox (${p.from_} .. ${p.to})`;
+        el.dataset.from_ = p.from_;
+        el.dataset.to = p.to;
+        break;
+      case "Progressbar":
+        el.textContent = `Progressbar (${p.mode}, ${p.orient})`;
+        el.dataset.orient = p.orient;
+        el.dataset.length = p.length;
+        el.dataset.mode = p.mode;
+        el.dataset.value = p.value;
+        break;
+      case "Frame":
+        el.style.backgroundColor = p.bg || DEFAULTS.frameBg;
+        el.style.borderStyle = p.relief;
+        el.style.borderWidth = (p.borderwidth ?? 0) + "px";
+        el.style.borderColor = "black";
+        el.textContent = "";
+        el.style.boxSizing = "border-box";
+        el.style.borderRadius = "4px";
+        break;
+      case "Canvas":
+        el.style.backgroundColor = p.bg || DEFAULTS.canvasBg;
+        el.style.borderStyle = p.relief;
+        el.style.borderWidth = (p.borderwidth ?? 1) + "px";
+        el.style.borderColor = "black";
+        el.textContent = "";
+        el.style.boxSizing = "border-box";
+        el.style.borderRadius = "4px";
+        break;
+      default:
+        el.textContent = type;
+        el.style.backgroundColor = bg;
+        el.style.color = fg;
+        applyCssFont(el, p);
+    }
+
+    const resizeHandle = document.createElement("div");
+    resizeHandle.classList.add("resize-handle");
+    el.appendChild(resizeHandle);
+
+    addDragAndResize(el, resizeHandle);
+    el.addEventListener("click", widgetClickHandler);
+    el.addEventListener("dblclick", widgetDoubleClickHandler);
+    el.addEventListener("keydown", widgetKeyDownHandler);
+
+    mainForm.appendChild(el);
+    widgets.push(el);
+
+    if(groupId){
+      if(!groups.has(groupId)) groups.set(groupId,new Set());
+      groups.get(groupId).add(el);
+    }
+
+    selectSingleWidget(el);
+    return el;
+  }
+
+  function addDragAndResize(el, resizeHandle){
+    let dragging = false, resizing = false;
+    let startX, startY, startLeft, startTop, startWidth, startHeight;
+
+    el.addEventListener("mousedown", e=>{
+      if(e.target === resizeHandle) return;
+      if(e.button !== 0) return;
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = parseInt(el.style.left);
+      startTop = parseInt(el.style.top);
+      e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", e=>{
+      if(dragging){
+        let dx = e.clientX - startX;
+        let dy = e.clientY - startY;
+        const groupId = el.dataset.group;
+        if(groupId && groups.has(groupId)){
+          groups.get(groupId).forEach(w=>{
+            let left = parseInt(w.style.left);
+            let top = parseInt(w.style.top);
+            let nx = left + dx;
+            let ny = top + dy;
+            nx = Math.max(0, Math.min(mainForm.clientWidth - w.offsetWidth, nx));
+            ny = Math.max(0, Math.min(mainForm.clientHeight - w.offsetHeight, ny));
+            w.style.left = nx + "px";
+            w.style.top = ny + "px";
+          });
+        }
+        else {
+          let newLeft = startLeft + dx;
+          let newTop = startTop + dy;
+          newLeft = Math.max(0, Math.min(mainForm.clientWidth - el.offsetWidth, newLeft));
+          newTop = Math.max(0, Math.min(mainForm.clientHeight - el.offsetHeight, newTop));
+          el.style.left = newLeft + "px";
+          el.style.top = newTop + "px";
+        }
+      }
+      else if(resizing){
+        let dx = e.clientX - startX;
+        let dy = e.clientY - startY;
+        let newWidth = Math.max(20, startWidth + dx);
+        let newHeight = Math.max(20, startHeight + dy);
+        el.style.width = newWidth + "px";
+        el.style.height = newHeight + "px";
+      }
+    });
+
+    document.addEventListener("mouseup", ()=>{
+      dragging = false;
+      resizing = false;
+    });
+
+    resizeHandle.addEventListener("mousedown", e=>{
+      if(e.button !== 0) return;
+      resizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = el.offsetWidth;
+      startHeight = el.offsetHeight;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
+
+  function widgetClickHandler(e){
+    e.stopPropagation();
+    if(!e.shiftKey) selectSingleWidget(e.currentTarget);
+    else toggleWidgetSelection(e.currentTarget);
+  }
+  function widgetDoubleClickHandler(e){
+    e.stopPropagation();
+    selectSingleWidget(e.currentTarget);
+    openPropertiesEditor();
+  }
+  function widgetKeyDownHandler(e){
+    if(e.key === "Delete" || e.key === "Backspace"){
+      e.preventDefault();
+      deleteSelectedWidgets();
+    }
+  }
+
+  function clearSelection(){
+    selectedWidgets.forEach(w=>w.classList.remove("selected"));
+    selectedWidgets.clear();
+    updateSelectionUI();
+    clearPropertiesEditor();
+  }
+  function selectSingleWidget(el){
+    clearSelection();
+    selectedWidgets.add(el);
+    el.classList.add("selected");
+    updateSelectionUI();
+    openPropertiesEditor();
+  }
+  function toggleWidgetSelection(el){
+    if(selectedWidgets.has(el)){
+      selectedWidgets.delete(el);
+      el.classList.remove("selected");
+    }
+    else {
+      selectedWidgets.add(el);
+      el.classList.add("selected");
+    }
+    updateSelectionUI();
+    clearPropertiesEditor();
+  }
+  canvas.addEventListener("click", ()=> clearSelection());
+
+  function updateSelectionUI(){
+    if(selectedWidgets.size === 0){
+      editPropertiesBtn.disabled = true;
+      deleteBtn.disabled = true;
+      groupBtn.disabled = true;
+      ungroupBtn.disabled = true;
+      multiSelectInfo.style.display = "none";
+    }
+    else if(selectedWidgets.size === 1){
+      deleteBtn.disabled = false;
+      editPropertiesBtn.disabled = false;
+      groupBtn.disabled = true;
+      const groupId = [...selectedWidgets][0].dataset.group;
+      ungroupBtn.disabled = !groupId;
+      multiSelectInfo.style.display = "none";
+    }
+    else {
+      deleteBtn.disabled = false;
+      editPropertiesBtn.disabled = true;
+      groupBtn.disabled = false;
+      ungroupBtn.disabled = true;
+      multiSelectInfo.style.display = "block";
+      clearPropertiesEditor();
+    }
+  }
+
+  editPropertiesBtn.addEventListener("click", ()=>{
+    if(selectedWidgets.size !== 1) return;
+    openPropertiesEditor();
+  });
+  function openPropertiesEditor(){
+    if(selectedWidgets.size !== 1) return;
+    const el = [...selectedWidgets][0];
+    renderPropertiesForm(el);
+  }
+  function clearPropertiesEditor(){
+    propertiesDiv.innerHTML = '<em>Select a widget to edit its properties.</em>';
+  }
+
+  function getWidgetProps(el){
+    const type = el.dataset.type;
+    let props = {};
+    const safeStyle = (elem, prop) => (elem && elem.style[prop]) || "";
+
+    if(["Button","Label"].includes(type)){
+      props.text = el.textContent;
+      props.bg = normalizeColor(safeStyle(el,"backgroundColor")) || widgetDefaults[type].bg;
+      props.fg = normalizeColor(safeStyle(el,"color")) || widgetDefaults[type].fg;
+      props.fontFamily = el.style.fontFamily || widgetDefaults[type].fontFamily;
+      props.fontSize = parseInt(el.style.fontSize||widgetDefaults[type].fontSize);
+      props.fontWeight = (el.style.fontWeight==="bold") ? "bold" : "normal";
+      props.fontSlant = (el.style.fontStyle==="italic") ? "italic" : "roman";
+      props.underline = (el.style.textDecoration||"none").includes("underline") ? "true" : "false";
+    }
+    else if(type === "Checkbutton" || type === "Radiobutton"){
+      const span = el.querySelector("span");
+      props.text = span ? span.textContent : el.textContent;
+      props.bg = normalizeColor(safeStyle(el,"backgroundColor")) || widgetDefaults[type].bg;
+      props.fg = normalizeColor(safeStyle(span,"color")) || widgetDefaults[type].fg;
+      props.fontFamily = (span?.style.fontFamily) || widgetDefaults[type].fontFamily;
+      props.fontSize = parseInt(span?.style.fontSize||widgetDefaults[type].fontSize);
+      props.fontWeight = (span?.style.fontWeight==="bold") ? "bold" : "normal";
+      props.fontSlant = (span?.style.fontStyle==="italic") ? "italic" : "roman";
+      props.underline = ((span?.style.textDecoration)||"none").includes("underline") ? "true" : "false";
+      if (type==="Radiobutton") props.value = el.dataset.value ?? 1;
+      props.variable = el.dataset.variable || "";
+    }
+    else if(type === "Entry"){
+      const input = el.querySelector("input");
+      props.text = input ? input.value : "";
+      props.bg = normalizeColor(safeStyle(input,"backgroundColor")) || widgetDefaults[type].bg;
+      props.fg = normalizeColor(safeStyle(input,"color")) || widgetDefaults[type].fg;
+      props.fontFamily = (input?.style.fontFamily) || widgetDefaults[type].fontFamily;
+      props.fontSize = parseInt(input?.style.fontSize||widgetDefaults[type].fontSize);
+      props.fontWeight = (input?.style.fontWeight==="bold") ? "bold" : "normal";
+      props.fontSlant = (input?.style.fontStyle==="italic") ? "italic" : "roman";
+      props.underline = ((input?.style.textDecoration)||"none").includes("underline") ? "true" : "false";
+      props.state = input ? (input.disabled ? "disabled" : (input.readOnly ? "readonly" : "normal")) : "normal";
+    }
+    else if(type === "Text"){
+      const ta = el.querySelector("textarea");
+      props.text = ta ? ta.value : "";
+      props.bg = normalizeColor(safeStyle(ta,"backgroundColor")) || widgetDefaults[type].bg;
+      props.fg = normalizeColor(safeStyle(ta,"color")) || widgetDefaults[type].fg;
+      props.fontFamily = (ta?.style.fontFamily) || widgetDefaults[type].fontFamily;
+      props.fontSize = parseInt(ta?.style.fontSize||widgetDefaults[type].fontSize);
+      props.fontWeight = (ta?.style.fontWeight==="bold") ? "bold" : "normal";
+      props.fontSlant = (ta?.style.fontStyle==="italic") ? "italic" : "roman";
+      props.underline = ((ta?.style.textDecoration)||"none").includes("underline") ? "true" : "false";
+      props.state = ta ? (ta.disabled ? "disabled" : "normal") : "normal";
+      props.wrap = el.dataset.wrap || "word";
+    }
+    else if(type === "Scale"){
+      props.from_ = el.dataset.from_ || 0;
+      props.to = el.dataset.to || 100;
+      props.orient = el.dataset.orient || "horizontal";
+    }
+    else if(type === "Listbox"){
+      let items = [];
+      el.childNodes.forEach(c=>{ if(c.nodeType===Node.ELEMENT_NODE) items.push(c.textContent); });
+      props.items = items;
+      props.bg = normalizeColor(safeStyle(el,"backgroundColor")) || widgetDefaults[type].bg;
+      props.fg = normalizeColor(safeStyle(el,"color")) || widgetDefaults[type].fg;
+      props.fontFamily = el.style.fontFamily || widgetDefaults[type].fontFamily;
+      props.fontSize = parseInt(el.style.fontSize||widgetDefaults[type].fontSize);
+      props.fontWeight = (el.style.fontWeight==="bold") ? "bold" : "normal";
+      props.fontSlant = (el.style.fontStyle==="italic") ? "italic" : "roman";
+      props.underline = (el.style.textDecoration||"none").includes("underline") ? "true" : "false";
+    }
+    else if(type === "Combobox"){
+      props.values = el.dataset.values ? el.dataset.values.split(",").filter(Boolean) : [];
+      props.state = el.dataset.state || "readonly";
+      props.fontFamily = el.style.fontFamily || widgetDefaults.Combobox.fontFamily;
+      props.fontSize = parseInt(el.style.fontSize||widgetDefaults.Combobox.fontSize);
+      props.fontWeight = (el.style.fontWeight==="bold") ? "bold" : "normal";
+      props.fontSlant = (el.style.fontStyle==="italic") ? "italic" : "roman";
+      props.underline = (el.style.textDecoration||"none").includes("underline") ? "true" : "false";
+    }
+    else if(type === "Spinbox"){
+      props.from_ = el.dataset.from_ || 0;
+      props.to = el.dataset.to || 10;
+      props.increment = parseFloat(el.dataset.increment || 1);
+      props.values = el.dataset.values ? el.dataset.values.split(",").filter(Boolean) : [];
+      props.state = el.dataset.state || "normal";
+      props.wrap = el.dataset.wrap || "false";
+    }
+    else if(type === "Progressbar"){
+      props.orient = el.dataset.orient || "horizontal";
+      props.length = el.dataset.length || 150;
+      props.mode = el.dataset.mode || "determinate";
+      props.value = el.dataset.value || 0;
+      props.maximum = el.dataset.maximum || 100;
+    }
+    else if(type === "Frame"){
+      props.bg = normalizeColor(safeStyle(el,"backgroundColor")) || widgetDefaults[type].bg;
+      props.borderwidth = el.style.borderWidth ? parseInt(el.style.borderWidth) : 0;
+      props.relief = el.style.borderStyle || "flat";
+    }
+    else if(type === "Canvas"){
+      props.bg = normalizeColor(safeStyle(el,"backgroundColor")) || widgetDefaults[type].bg;
+      props.borderwidth = el.style.borderWidth ? parseInt(el.style.borderWidth) : 1;
+      props.relief = el.style.borderStyle || "flat";
+    }
+    return props;
+  }
+
+  function renderPropertiesForm(el){
+    const type = el.dataset.type;
+    const schema = propertySchemas[type];
+    if(!schema){
+      propertiesDiv.innerHTML = "<em>No editable properties for this widget.</em>";
+      return;
+    }
+    propertiesDiv.innerHTML = "";
+    const form = document.createElement("form");
+    form.id = "propertiesForm";
+
+    const currentProps = getWidgetProps(el);
+
+    for(const prop in schema){
+      const propData = schema[prop];
+      const label = document.createElement("label");
+      label.textContent = propData.label;
+
+      let input;
+      if(propData.type === "textarea"){
+        input = document.createElement("textarea");
+        input.value = currentProps[prop] || "";
+        input.rows = 4;
+      }
+      else if(propData.type === "select"){
+        input = document.createElement("select");
+        propData.options.forEach(opt=>{
+          const option = document.createElement("option");
+          option.value = opt;
+          option.textContent = opt;
+          if(String(currentProps[prop])===String(opt)) option.selected = true;
+          input.appendChild(option);
+        });
+      }
+      else if(propData.type === "number"){
+        input = document.createElement("input");
+        input.type = "number";
+        input.value = currentProps[prop] != null ? currentProps[prop] : "";
+      }
+      else if(propData.type === "color"){
+        input = document.createElement("input");
+        input.type = "color";
+        input.value = currentProps[prop] || "#ffffff";
+      }
+      else {
+        input = document.createElement("input");
+        input.type = "text";
+        input.value = currentProps[prop] || "";
+      }
+
+      input.name = prop;
+      input.dataset.propType = propData.type;
+      input.style.marginTop = "4px";
+      input.style.marginBottom = "10px";
+      label.appendChild(input);
+      form.appendChild(label);
+    }
+
+    const row = document.createElement("div");
+    row.className = "inline";
+    const wLabel = document.createElement("label");
+    wLabel.textContent = "Width (px)";
+    const wInput = document.createElement("input");
+    wInput.type = "number"; wInput.min = 20;
+    wInput.value = parseInt(el.style.width) || widgetDefaults[type]?.w || 80;
+    wInput.name = "w"; wInput.style.marginTop = "4px"; wInput.style.marginBottom = "10px";
+    wLabel.appendChild(wInput);
+    const hLabel = document.createElement("label");
+    hLabel.textContent = "Height (px)";
+    const hInput = document.createElement("input");
+    hInput.type = "number"; hInput.min = 20;
+    hInput.value = parseInt(el.style.height) || widgetDefaults[type]?.h || 30;
+    hInput.name = "h"; hInput.style.marginTop = "4px"; hInput.style.marginBottom = "10px";
+    hLabel.appendChild(hInput);
+    row.appendChild(wLabel); row.appendChild(hLabel);
+    form.appendChild(row);
+
+    form.addEventListener("submit", e=>{ e.preventDefault(); applyPropertiesForm(el, new FormData(form)); });
+    form.addEventListener("input", ()=> applyPropertiesForm(el, new FormData(form)));
+
+    propertiesDiv.appendChild(form);
+  }
+
+  function applyPropertiesForm(el, formData){
+    const type = el.dataset.type;
+
+    for(const [k,vRaw] of formData.entries()){
+      const v = (k === "bg" || k === "fg") ? normalizeColor(vRaw) : vRaw;
+
+      if(k==="text"){
+        if(["Button","Label"].includes(type)) el.textContent = v;
+        else if(type==="Checkbutton" || type==="Radiobutton"){
+          const span = el.querySelector("span");
+          if(span) span.textContent = v;
+        }
+        else if(type==="Entry"){
+          const input = el.querySelector("input");
+          if(input) input.value = v;
+        }
+        else if(type==="Text"){
+          const ta = el.querySelector("textarea");
+          if(ta) ta.value = v;
+        }
+      }
+      else if(k==="variable" && (type==="Checkbutton" || type==="Radiobutton")){
+        el.dataset.variable = v;
+      }
+      else if(k==="value" && type==="Radiobutton"){
+        el.dataset.value = v;
+      }
+      else if(k==="from_" && type==="Scale"){
+        el.dataset.from_ = v;
+        el.textContent = `Scale (${v} .. ${el.dataset.to || 100})`;
+      }
+      else if(k==="to" && type==="Scale"){
+        el.dataset.to = v;
+        el.textContent = `Scale (${el.dataset.from_ || 0} .. ${v})`;
+      }
+      else if(k==="orient" && (type==="Scale" || type==="Progressbar")){
+        el.dataset.orient = v;
+        if(type==="Scale") el.textContent = `Scale (${el.dataset.from_ || 0} .. ${el.dataset.to || 100})`;
+        else el.textContent = `Progressbar (${el.dataset.mode || "determinate"}, ${v})`;
+      }
+      else if(k==="items" && type==="Listbox"){
+        const items = v.split("\n").map(s=>s.trim()).filter(Boolean);
+        while(el.firstChild) el.removeChild(el.firstChild);
+        items.forEach(item=>{
+          const li = document.createElement("div");
+          li.style.padding = "2px 4px";
+          li.style.borderBottom = "1px solid #ddd";
+          li.style.fontFamily = el.style.fontFamily || "Arial";
+          li.style.fontSize = el.style.fontSize || "12px";
+          li.style.fontWeight = el.style.fontWeight || "normal";
+          li.style.fontStyle = el.style.fontStyle || "normal";
+          li.style.textDecoration = el.style.textDecoration || "none";
+          li.textContent = item;
+          el.appendChild(li);
+        });
+        const resizeHandle = document.createElement("div");
+        resizeHandle.classList.add("resize-handle");
+        el.appendChild(resizeHandle);
+        addDragAndResize(el, resizeHandle);
+        el.style.backgroundColor = normalizeColor(formData.get("bg")) || widgetDefaults.Listbox.bg;
+        el.style.color = normalizeColor(formData.get("fg")) || widgetDefaults.Listbox.fg;
+      }
+      else if(k==="values" && type==="Combobox"){
+        const values = v.split(",").map(s=>s.trim()).filter(Boolean);
+        el.dataset.values = values.join(",");
+        el.textContent = "Combobox: " + values.join(", ");
+      }
+      else if(k==="state" && type==="Combobox"){
+        el.dataset.state = v;
+        // visually indicate state
+        el.style.opacity = v === 'disabled' ? 0.6 : 1.0;
+      }
+      else if(["fontFamily","fontSize","fontWeight","fontSlant","underline"].includes(k) && type==="Combobox"){
+        const props = getWidgetProps(el);
+        props[k] = k==="fontSize" ? parseInt(v) : v;
+        applyCssFont(el, props);
+      }
+      else if(k==="from_" && type==="Spinbox"){
+        el.dataset.from_ = v;
+        el.textContent = `Spinbox (${v} .. ${el.dataset.to || 10})`;
+      }
+      else if(k==="to" && type==="Spinbox"){
+        el.dataset.to = v;
+        el.textContent = `Spinbox (${el.dataset.from_ || 0} .. ${v})`;
+      }
+      else if(k==="increment" && type==="Spinbox"){
+        el.dataset.increment = v;
+      }
+      else if(k==="wrap" && type==="Spinbox"){
+        el.dataset.wrap = v;
+      }
+      else if(k==="values" && type==="Spinbox"){
+        const values = v.split(",").map(s=>s.trim()).filter(Boolean);
+        el.dataset.values = values.join(",");
+        el.textContent = values.length ? `Spinbox (${values.join(", ")})` : `Spinbox (${el.dataset.from_ || 0} .. ${el.dataset.to || 10})`;
+      }
+      else if(k==="state" && type==="Spinbox"){
+        el.dataset.state = v;
+        el.style.opacity = v === 'disabled' ? 0.6 : 1.0;
+      }
+      else if(k==="maximum" && type==="Progressbar"){
+        el.dataset.maximum = v;
+      }
+      else if(k==="length" && type==="Progressbar"){
+        el.dataset.length = v;
+      }
+      else if(k==="mode" && type==="Progressbar"){
+        el.dataset.mode = v;
+      }
+      else if(k==="value" && type==="Progressbar"){
+        el.dataset.value = v;
+      }
+      else if(k==="state" && type==="Entry"){
+        const input = el.querySelector("input");
+        if(input){
+          input.disabled = v === 'disabled';
+          input.readOnly = v === 'readonly';
+          el.dataset.state = v;
+        }
+      }
+      else if(k==="state" && type==="Text"){
+        const ta = el.querySelector("textarea");
+        if(ta){
+          ta.disabled = v === 'disabled';
+          el.dataset.state = v;
+        }
+      }
+      else if(k==="wrap" && type==="Text"){
+        el.dataset.wrap = v;
+      }
+      else if(k==="state" && type==="Radiobutton"){
+        const input = el.querySelector("input");
+        if(input){ input.disabled = v === 'disabled'; }
+        el.dataset.state = v;
+      }
+      else if(k==="bg"){
+        const hex = v || widgetDefaults[type]?.bg;
+        if(type==="Entry"){
+          const input = el.querySelector("input");
+          if(input) input.style.backgroundColor = hex;
+        }
+        else if(type==="Text"){
+          const ta = el.querySelector("textarea");
+          if(ta) ta.style.backgroundColor = hex;
+        }
+        else {
+          el.style.backgroundColor = hex;
+        }
+      }
+      else if(k==="fg"){
+        const hex = v || widgetDefaults[type]?.fg;
+        if(type==="Entry"){
+          const input = el.querySelector("input");
+          if(input) input.style.color = hex;
+        }
+        else if(type==="Text"){
+          const ta = el.querySelector("textarea");
+          if(ta) ta.style.color = hex;
+        }
+        else {
+          el.style.color = hex;
+        }
+      }
+      else if(["fontFamily","fontSize","fontWeight","fontSlant","underline"].includes(k)){
+        const applyTarget = (type==="Entry") ? el.querySelector("input")
+                            : (type==="Text") ? el.querySelector("textarea")
+                            : (type==="Checkbutton"||type==="Radiobutton") ? el.querySelector("span")
+                            : el;
+        const props = getWidgetProps(el);
+        props[k] = k==="fontSize" ? parseInt(v) : v;
+        applyCssFont(applyTarget, props);
+        if (type==="Listbox") {
+          el.childNodes.forEach(c=>{
+            if(c.nodeType===Node.ELEMENT_NODE){
+              c.style.fontFamily = props.fontFamily || "Arial";
+              c.style.fontSize = (parseInt(props.fontSize||12)) + "px";
+              c.style.fontWeight = (props.fontWeight==="bold") ? "bold" : "normal";
+              c.style.fontStyle = (props.fontSlant==="italic") ? "italic" : "normal";
+              c.style.textDecoration = String(props.underline||"false") === "true" ? "underline" : "none";
+            }
+          });
+        }
+      }
+      else if(k==="w"){
+        el.style.width = Math.max(20, parseInt(v)||20) + "px";
+      }
+      else if(k==="h"){
+        el.style.height = Math.max(20, parseInt(v)||20) + "px";
+      }
+    }
+  }
+
+  groupBtn.addEventListener("click", () => {
+    if(selectedWidgets.size < 2) return alert("Select at least 2 widgets to group");
+    const groupId = `g${++groupCounter}`;
+    selectedWidgets.forEach(w => w.dataset.group = groupId);
+    groups.set(groupId, new Set(selectedWidgets));
+    clearSelection();
+    groups.get(groupId).forEach(w => {w.classList.add("selected"); selectedWidgets.add(w)});
+    updateSelectionUI();
+  });
+
+  ungroupBtn.addEventListener("click", () => {
+    if(selectedWidgets.size !==1) return;
+    const el = [...selectedWidgets][0];
+    const gid = el.dataset.group;
+    if(!gid) return alert("Selected widget is not grouped");
+    groups.get(gid).forEach(w => delete w.dataset.group);
+    groups.delete(gid);
+    clearSelection();
+  });
+
+  deleteBtn.addEventListener("click", deleteSelectedWidgets);
+  function deleteSelectedWidgets(){
+    selectedWidgets.forEach(w => {
+      const gid = w.dataset.group;
+      if(gid && groups.has(gid)){
+        groups.get(gid).delete(w);
+        if(groups.get(gid).size === 0) groups.delete(gid);
+      }
+      mainForm.removeChild(w);
+      widgets = widgets.filter(x => x !== w);
+    });
+    clearSelection();
+    codeOutput.value = "";
+    clearPropertiesEditor();
+  }
+
+  clearCanvasBtn.addEventListener("click", () => {
+    if(confirm("Clear all widgets?")){
+      widgets.forEach(w => mainForm.removeChild(w));
+      widgets = [];
+      groups.clear();
+      clearSelection();
+      codeOutput.value = "";
+      clearPropertiesEditor();
+    }
+  });
+
+  saveLayoutBtn.addEventListener("click", () => {
+    const layout = widgets.map(w => ({
+      id: w.dataset.id, type: w.dataset.type,
+      x: parseInt(w.style.left), y: parseInt(w.style.top),
+      w: parseInt(w.style.width), h: parseInt(w.style.height),
+      groupId: w.dataset.group || null,
+      props: getWidgetProps(w)
+    }));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(layout, null, 2));
+    const a = document.createElement("a");
+    a.href = dataStr;
+    a.download = "tkinter_layout_pro.json";
+    a.click();
+  });
+
+  loadLayoutBtn.addEventListener("click", () => fileLoader.click());
+  fileLoader.addEventListener("change", e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const layout = JSON.parse(e.target.result);
+        loadLayout(layout);
+      } catch {
+        alert("Invalid file");
+      }
+    };
+    reader.readAsText(file);
+    fileLoader.value = "";
+  });
+  function loadLayout(layout){
+    widgets.forEach(w => mainForm.removeChild(w));
+    widgets = [];
+    groups.clear();
+    clearSelection();
+    widgetCounter = 0;
+    groupCounter = 0;
+    layout.forEach(item => {
+      createWidget(item.type, item.x, item.y, item.props, item.id, item.groupId);
+      if(item.groupId) groupCounter = Math.max(groupCounter, Number(item.groupId.slice(1))||0);
+      widgetCounter = Math.max(widgetCounter, Number(item.id.slice(1))||0);
+    });
+    groupCounter++; widgetCounter++;
+  }
+
+  let resizingForm = false;
+  let startX, startY, startWidth, startHeight;
+
+  const formResizeHandle = document.createElement("div");
+  formResizeHandle.style.position = "absolute";
+  formResizeHandle.style.width = "10px";
+  formResizeHandle.style.height = "10px";
+  formResizeHandle.style.background = "#1976d2";
+  formResizeHandle.style.cursor = "se-resize";
+  formResizeHandle.style.right = "0";
+  formResizeHandle.style.bottom = "0";
+  formResizeHandle.style.zIndex = "10000";
+  canvas.appendChild(formResizeHandle);
+
+  formResizeHandle.addEventListener("mousedown", (e) => {
+    resizingForm = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startWidth = canvas.offsetWidth;
+    startHeight = canvas.offsetHeight;
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (resizingForm) {
+      const newWidth = Math.max(300, startWidth + (e.clientX - startX));
+      const newHeight = Math.max(300, startHeight + (e.clientY - startY));
+      canvas.style.width = `${newWidth}px`;
+      canvas.style.height = `${newHeight}px`;
+    }
+  });
+  document.addEventListener("mouseup", () => { resizingForm = false; });
+
+  generateCodeBtn.addEventListener("click", () => {
+    const formWidth = mainForm.offsetWidth;
+    const formHeight = mainForm.offsetHeight;
+    const formTitle = mainForm.dataset.title || "Generated GUI";
+    const formBg = mainForm.dataset.bg || DEFAULTS.bgMain;
+
+    let code = `import tkinter as tk\nfrom tkinter import *\nfrom tkinter import ttk\n\n`;
+    code += `windowDesign = Tk()\n`;
+    code += `windowDesign.title('${formTitle}')\n`;
+    code += `windowDesign.iconbitmap('')\n`;
+    code += `windowDesign.geometry('${formWidth}x${formHeight}')\n`;
+    code += `windowDesign.configure(bg='${formBg}')\n`;
+    code += `windowDesign.resizable(False, False)\n\n`;
+
+    // Tk variables for check/radio
+    const varDecls = [];
+    const usedVars = new Map(); // name -> type
+    widgets.forEach(w => {
+      const type = w.dataset.type;
+      const p = getWidgetProps(w);
+      if (type === "Checkbutton" && p.variable) usedVars.set(p.variable, "BooleanVar");
+      if (type === "Radiobutton" && p.variable) {
+        const isNum = !isNaN(parseFloat(p.value));
+        usedVars.set(p.variable, isNum ? "IntVar" : "StringVar");
+      }
+    });
+    if (usedVars.size) {
+      usedVars.forEach((vtype, vname) => { varDecls.push(`${vname} = ${vtype}()`); });
+      code += "# Tk variables\n" + varDecls.join("\n") + "\n\n";
+    }
+
+    code += "# Widgets creation\n";
+
+    widgets.forEach((w) => {
+      const id = w.dataset.id;
+      const type = w.dataset.type;
+      const x = parseInt(w.style.left);
+      const y = parseInt(w.style.top);
+      const width = parseInt(w.style.width);
+      const height = parseInt(w.style.height);
+      const p = getWidgetProps(w);
+
+      const bgHex = normalizeColor(p.bg);
+      const fgHex = normalizeColor(p.fg);
+      const fontTuple = buildTkFontTuple(p);
+
+      const opts = [];
+      if (bgHex) opts.push(`bg="${bgHex}"`);
+      if (fgHex) opts.push(`fg="${fgHex}"`);
+      if (fontTuple) opts.push(`font=${fontTuple}`);
+      const optsStr = opts.length ? ", " + opts.join(", ") : "";
+
+      if (type === "Button") {
+        code += `button_${id} = Button(windowDesign, text="${pyStrEscape(p.text || "")}"${optsStr})\n`;
+        code += `button_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Label") {
+        code += `label_${id} = Label(windowDesign, text="${pyStrEscape(p.text || "")}"${optsStr})\n`;
+        code += `label_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Entry") {
+        code += `entry_${id} = Entry(windowDesign${optsStr})\n`;
+        code += `entry_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n`;
+        if (p.text) code += `entry_${id}.insert(0, "${pyStrEscape(p.text)}")\n`;
+        code += `\n`;
+      }
+      else if (type === "Text") {
+        code += `text_${id} = Text(windowDesign${optsStr})\n`;
+        code += `text_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n`;
+        if (p.text) code += `text_${id}.insert("1.0", "${pyStrEscape(p.text)}")\n`;
+        code += `\n`;
+      }
+      else if (type === "Checkbutton") {
+        const varPart = p.variable ? `, variable=${p.variable}` : "";
+        code += `checkbutton_${id} = Checkbutton(windowDesign, text="${pyStrEscape(p.text || "")}"${optsStr}${varPart})\n`;
+        code += `checkbutton_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Radiobutton") {
+        const varPart = p.variable ? `, variable=${p.variable}` : "";
+        const valPart = `, value=${isNaN(parseFloat(p.value)) ? `"${pyStrEscape(p.value)}"` : p.value}`;
+        code += `radiobutton_${id} = Radiobutton(windowDesign, text="${pyStrEscape(p.text || "")}"${optsStr}${varPart}${valPart})\n`;
+        code += `radiobutton_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Scale") {
+        code += `scale_${id} = Scale(windowDesign, from_=${p.from_}, to=${p.to}, orient="${p.orient}")\n`;
+        code += `scale_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Listbox") {
+        code += `listbox_${id} = Listbox(windowDesign${optsStr})\n`;
+        code += `listbox_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n`;
+        (p.items||[]).forEach(item => {
+          code += `listbox_${id}.insert(END, "${pyStrEscape(item)}")\n`;
+        });
+        code += `\n`;
+      }
+      else if (type === "Combobox") {
+        code += `combobox_${id} = ttk.Combobox(windowDesign, values=${JSON.stringify(p.values || [])})\n`;
+        code += `combobox_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Spinbox") {
+        code += `spinbox_${id} = Spinbox(windowDesign, from_=${p.from_}, to=${p.to})\n`;
+        code += `spinbox_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Progressbar") {
+        code += `progressbar_${id} = ttk.Progressbar(windowDesign, orient="${p.orient}", mode="${p.mode}", length=${p.length})\n`;
+        code += `progressbar_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n`;
+        if (p.value != null) code += `progressbar_${id}.config(value=${p.value})\n`;
+        code += `\n`;
+      }
+      else if (type === "Frame") {
+        const frameOpts = [];
+        const frameBg = normalizeColor(p.bg);
+        if (frameBg) frameOpts.push(`bg="${frameBg}"`);
+        if (p.relief) frameOpts.push(`relief="${p.relief}"`);
+        frameOpts.push(`borderwidth=${p.borderwidth ?? 0}`);
+        const frameStr = frameOpts.length ? ", " + frameOpts.join(", ") : "";
+        code += `frame_${id} = tk.LabelFrame(windowDesign${frameStr})\n`;
+        code += `frame_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+      else if (type === "Canvas") {
+        const canvasOpts = [];
+        const canvasBg = normalizeColor(p.bg);
+        if (canvasBg) canvasOpts.push(`bg="${canvasBg}"`);
+        if (p.relief) canvasOpts.push(`relief="${p.relief}"`);
+        canvasOpts.push(`borderwidth=${p.borderwidth ?? 0}`);
+        const canvasStr = canvasOpts.length ? ", " + canvasOpts.join(", ") : "";
+        code += `canvas_${id} = Canvas(windowDesign${canvasStr})\n`;
+        code += `canvas_${id}.place(x=${x}, y=${y}, width=${width}, height=${height})\n\n`;
+      }
+    });
+
+    code += `if __name__ == "__main__":\n`;
+    code += `    windowDesign.mainloop()\n`;
+    codeOutput.value = code.trim();
+  });
+
+  // Drag & drop palette widgets
+  palette.querySelectorAll("button.widget-btn").forEach(btn=>{
+    btn.setAttribute("draggable", "true");
+    btn.addEventListener("dragstart", e=>{
+      e.dataTransfer.setData("widget-type", btn.dataset.widget);
+      e.dataTransfer.effectAllowed = "copy";
+    });
+  });
+  canvas.addEventListener("dragover", e=>{
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  canvas.addEventListener("drop", e=>{
+    e.preventDefault();
+    const type = e.dataTransfer.getData("widget-type");
+    if(!type) return;
+    const rect = canvas.getBoundingClientRect();
+    const mainRect = mainForm.getBoundingClientRect();
+    const x = e.clientX - mainRect.left + mainForm.scrollLeft;
+    const y = e.clientY - mainRect.top + mainForm.scrollTop;
+    createWidget(type, Math.max(0,x), Math.max(0,y));
+  });
+  palette.querySelectorAll("button.widget-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=> createWidget(btn.dataset.widget, 20, 20));
+  });
+
+  // Context menu + Copy/Paste
+  let contextTarget = null;
+  canvas.addEventListener("contextmenu", e=>{
+    e.preventDefault();
+    const target = e.target.closest(".widget");
+    const isOnMain = !target && e.target.closest("#canvas");
+
+    // Vị trí hiển thị menu
+    contextMenu.style.left = e.pageX + "px";
+    contextMenu.style.top = e.pageY + "px";
+    contextMenu.style.display = "block";
+
+    contextTarget = target;
+
+    // Cấu hình item menu theo ngữ cảnh
+    if (target) {
+      // Chuột phải trên widget: bật Edit/Copy/Delete, tắt Paste
+      ctxEditProperties.style.display = "block";
+      ctxCopyWidget.style.display = "block";
+      ctxDelete.style.display = "block";
+      ctxPasteWidget.style.display = "none";
+      selectSingleWidget(target);
+    } else if (isOnMain) {
+      // Chuột phải vùng trống trên main form: chỉ Paste (nếu có clipboard)
+      ctxEditProperties.style.display = "none";
+      ctxCopyWidget.style.display = "none";
+      ctxDelete.style.display = "none";
+      ctxPasteWidget.style.display = widgetClipboard ? "block" : "none";
+    } else {
+      contextMenu.style.display = "none";
+      contextTarget = null;
+    }
+
+    // Lưu vị trí click để paste
+    contextMenu.dataset.clickX = e.clientX;
+    contextMenu.dataset.clickY = e.clientY;
+  });
+
+  document.body.addEventListener("click", ()=>{
+    contextMenu.style.display = "none";
+    contextTarget = null;
+  });
+
+  ctxEditProperties.addEventListener("click", ()=>{
+    contextMenu.style.display = "none";
+    if(contextTarget){
+      selectedWidgets.clear();
+      selectedWidgets.add(contextTarget);
+      updateSelectionUI();
+      openPropertiesEditor();
+    }
+  });
+
+  ctxCopyWidget.addEventListener("click", ()=>{
+    contextMenu.style.display = "none";
+    if(contextTarget){
+      // Sao chép props và type của widget
+      const props = getWidgetProps(contextTarget);
+      const type = contextTarget.dataset.type;
+      const w = parseInt(contextTarget.style.width);
+      const h = parseInt(contextTarget.style.height);
+      widgetClipboard = { type, props: Object.assign({}, props, { w, h }) };
+      alert("Widget copied!");
+    }
+  });
+
+  ctxPasteWidget.addEventListener("click", ()=>{
+    contextMenu.style.display = "none";
+    if(!widgetClipboard) return;
+    // Tính vị trí trong mainForm từ tọa độ click menu
+    const clickX = parseInt(contextMenu.dataset.clickX || "0", 10);
+    const clickY = parseInt(contextMenu.dataset.clickY || "0", 10);
+    const mainRect = mainForm.getBoundingClientRect();
+    const x = clickX - mainRect.left + mainForm.scrollLeft;
+    const y = clickY - mainRect.top + mainForm.scrollTop;
+
+    const clonedProps = JSON.parse(JSON.stringify(widgetClipboard.props || {}));
+    // Đặt w/h nếu có
+    if (clonedProps.w) clonedProps.w = Math.max(20, parseInt(clonedProps.w));
+    if (clonedProps.h) clonedProps.h = Math.max(20, parseInt(clonedProps.h));
+
+    createWidget(widgetClipboard.type, Math.max(0,x), Math.max(0,y), clonedProps);
+  });
+
+  ctxDelete.addEventListener("click", ()=>{
+    contextMenu.style.display = "none";
+    if(contextTarget){
+      selectedWidgets.clear();
+      selectedWidgets.add(contextTarget);
+      updateSelectionUI();
+      deleteBtn.click();
+    }
+  });
+
+  // Copy/download
+  copyCodeBtn.addEventListener("click", ()=>{
+    if(!codeOutput.value) return;
+    navigator.clipboard.writeText(codeOutput.value).then(()=>{
+      alert("Code copied to clipboard!");
+    }).catch(()=>{
+      alert("Copy failed.");
+    });
+  });
+  downloadCodeBtn.addEventListener("click", ()=>{
+    if(!codeOutput.value) return;
+    const blob = new Blob([codeOutput.value], {type:"text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "generated_gui.py";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Khởi tạo
+  clearSelection();
+  codeOutput.value = "";
+  clearPropertiesEditor();
+  updateGeneratedCodePreview();
+})();
+</script>
+
+</body>
+</html>
